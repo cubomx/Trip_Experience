@@ -1,0 +1,24 @@
+{
+  "name": "trip_exp",
+  "version": "1.0.0",
+  "description": "Handles multimedia files and converts all into a video.",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Sergio Velazquez",
+  "license": "ISC",
+  "dependencies": {
+    "bubblesort": "^1.0.1",
+    "exiftool": "0.0.3",
+    "express": "^4.16.4",
+    "ffmpeg": "0.0.4",
+    "fluent-ffmpeg": "^2.1.2",
+    "morgan": "^1.9.1",
+    "multer": "^1.4.1",
+    "request": "^2.88.0",
+    "socket.io": "^2.2.0",
+    "socketio-file-upload": "^0.7.0",
+    "videoshow": "^0.1.11"
+  }
+}

@@ -1,0 +1,44 @@
+<!DOCTYPE HTML>
+<!--
+	Story by HTML5 UP
+	html5up.net | @ajlkn
+	Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+
+	Note: Only needed for demo purposes. Delete for production sites.
+-->
+<html>
+	<head>
+		<title>Trip Experience</title>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+		<script src="/socket.io/socket.io.js"></script>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+		<link rel="stylesheet" href="css/main.css" />
+	</head>
+	<body class="is-preload">
+			<div id="wrapper" class="divided">
+					<section class="banner style1 orient-left content-align-left image-position-right fullscreen onload-image-fade-in onload-content-fade-right">
+						<div class="content">
+							<form class="" action="/upload" method="post" enctype="multipart/form-data">
+								<h1 style=" text-align: center">Submit your photos</h1>
+								<p class="major">Created by Sergio Velázquez</p>
+								<p>This is a <strong>software</strong> which makes a video from your files.</p>
+								<ul class="actions stacked">
+									<li><input type="file" name="files" id ="files" class="button large wide smooth-scroll-middle" multiple size="40" name="select_image">
+									<li><button type="submit" class="button large wide smooth-scroll-middle">Do it!</button></li>
+								</ul>
+							</form>
+						</div>
+						<div class="image">
+							<img src="images/banner.jpg" alt="" />
+						</div>
+					</section>
+				</div>
+			<script src="js/jquery.min.js"></script>
+			<script src="js/breakpoints.min.js"></script>
+			<script src="js/main.js"></script>
+			<script src="js/functions.js"></script>
+	</body>
+</html>
