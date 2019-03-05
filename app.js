@@ -46,6 +46,17 @@ app.use(bodyParser.json());
 
 app.use(bodyParser.urlencoded({ extended: false}))
 
+function sortJson(json){
+  return new Promise( (resolve, reject) =>{
+      if(json === null){
+        reject('Error: null value ')
+      }
+      resolve(sortJsonArray(json, 'date', 'des'));
+      resolve(json)
+  })
+
+}
+
 function getData(fileList){
   return new Promise( (resolve, reject) =>{
     files = fileList
@@ -87,23 +98,28 @@ function getData(fileList){
                 gpsLocation.push(parseFloat(gps[0+(j*5)]) + (parseFloat(gps[2+(j*5)])/60) + (parseFloat(gps[3+(j*5)])/3600))
               }
               let pos = gpsLocation[0] + ',' + (gpsLocation[1])*-1
-              info[i] = clone(json)
-
-              info[i].date = numberDate
-              info[i].path = files[i].path + i
+              info[2*i] = clone(json)
+              info[(2*i) + 1] = clone(json)
+              info[2*i].date = numberDate
+              info[2*i].path = files[i].path + i
+              info[2*i].position = pos
+              info[(2*i) + 1].date = numberDate + 0.000000001
+              info[(2*i) + 1].path = i+'1image.png'
+              info[(2*i) + 1].position = pos
               paths.push(i+'1image.png')
               paths.push(files[i].path + i)
-              info[i].position = pos
+
               url+= pos + zoomSize + mark + pos + ',lightblue1'
-              console.log(info)
 
               download(url, i+'1image.png', function(){
                 console.log('done');
                 index += 1
-                console.log(index + ' phto')
-                if (index == files.length){
-                  resolve(paths)
-                }
+                var images = sortJson(info).then(function(result){
+                  if (index == files.length){
+                    resolve(info)
+                  }
+                } )
+
               })
             };
           })
@@ -116,6 +132,7 @@ function getData(fileList){
 
 app.post('/upload', upload.array('files'), (req, res) =>{
   var data = getData(req.files).then(function(result){
+    console.log(result)
     videoshow(result, videoOptions)
     .save('video.mp4')
     .on('start', (command) =>{
@@ -127,7 +144,6 @@ app.post('/upload', upload.array('files'), (req, res) =>{
     })
     .on('end', (output) =>{
       console.error('Video created in:', output);
-      sortJsonArray(info, 'date', 'asc');
       res.sendfile(output)
 
     })
@@ -146,4 +162,3 @@ var download = function(uri, filename, callback){
 
 
 module.exports = server;
-
