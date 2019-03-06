@@ -2,9 +2,12 @@ const express = require('express');
 const sharp = require('sharp');
 const morgan =  require('morgan');
 var videoshow = require('videoshow');
+var FfmpegCommand = require('fluent-ffmpeg');
 var clone = require('clone');
-const bodyParser = require('body-parser')
-const request = require('request')
+const bodyParser = require('body-parser');
+var distance = require('gps-distance');
+const concat = require('ffmpeg-concat')
+const request = require('request');
 const port = 3000
 const routes = require('./routes');
 const exif = require('exiftool');
@@ -20,19 +23,9 @@ server.listen(port, () =>{
 });
 const io = require('socket.io')(server)
 var files
+var jsonN
 var paths = []
 var info = []
-var videoOptions = {
-  fps: 25,
-  loop: 5,
-  transition: true,
-  transitionDuration: 1,
-  videoBitrate: 1024,
-  videoCodec: 'libx264',
-  size: '1024x?',
-  format: 'mp4',
-  pixelFormat: 'yuv420p'
-}
 
 app.set('appName', 'Trip Experience');
 
@@ -52,9 +45,7 @@ function sortJson(json){
         reject('Error: null value ')
       }
       resolve(sortJsonArray(json, 'date', 'des'));
-      resolve(json)
   })
-
 }
 
 function getData(fileList){
@@ -63,13 +54,7 @@ function getData(fileList){
     let gps = ""
     var index = 0
     for(let i = 0; i < files.length; i++){
-      sharp(files[i].path)
-      .resize(1024, 576)
-      .ignoreAspectRatio()
-      .toFile(files[i].path+i)
-      .then( (data) => {} )
-      .catch( (err) =>{reject(err)})
-      var json = {"path": 'im.png', "date": 2019, "position": '2929232'}
+      var json = {"path": 'im.png', "date": 2019, "position": '2929232', "ext": 'image'}
       let url = 'http://gcsproject-api.000webhostapp.com/staticmap.php/?center='
       let zoomSize = '&zoom=17&size=1024x576'
       let mark ='&maptype=mapnik&markers='
@@ -83,6 +68,22 @@ function getData(fileList){
             if (err)
               throw err;
             else {
+              info[(2*i)] = clone(json)
+              info[(2*i) + 1] = clone(json)
+              let type = metadata['mimeType'].split("/")
+              if (type[0] != 'video'){
+                sharp(files[i].path)
+                .resize(1024, 576)
+                .ignoreAspectRatio()
+                .toFile(files[i].path+i)
+                .then( (data) => {} )
+                .catch( (err) =>{reject(err)})
+                info[(2*i)].path = files[i].path + i
+              }
+              else{
+                info[(2*i)].path = files[i].path
+                info[(2*i)].ext = 'video'
+              }
               date = metadata['createDate']
               date = date.split(/[: \s]/)
               numberDate += parseFloat(date[0])
@@ -93,16 +94,16 @@ function getData(fileList){
               numberDate += ((parseFloat (date[5]))+1)/(60*12*60*60)
               gps = metadata['gpsPosition']
               gps = gps.split(' ')
+
               gpsLocation = new Array()
               for(let j = 0; j < 2; j++){
                 gpsLocation.push(parseFloat(gps[0+(j*5)]) + (parseFloat(gps[2+(j*5)])/60) + (parseFloat(gps[3+(j*5)])/3600))
               }
               let pos = gpsLocation[0] + ',' + (gpsLocation[1])*-1
-              info[2*i] = clone(json)
-              info[(2*i) + 1] = clone(json)
-              info[2*i].date = numberDate
-              info[2*i].path = files[i].path + i
-              info[2*i].position = pos
+
+              info[(2*i)].date = numberDate
+
+              info[(2*i)].position = pos
               info[(2*i) + 1].date = numberDate + 0.000000001
               info[(2*i) + 1].path = i+'1image.png'
               info[(2*i) + 1].position = pos
@@ -114,51 +115,97 @@ function getData(fileList){
               download(url, i+'1image.png', function(){
                 console.log('done');
                 index += 1
-                var images = sortJson(info).then(function(result){
+                sortJson(info).then(function(result){
                   if (index == files.length){
-                    resolve(info)
+                    resolve(result)
                   }
                 } )
-
               })
             };
           })
         };
-
       });
     };
   })
 }
 
-app.post('/upload', upload.array('files'), (req, res) =>{
-  var data = getData(req.files).then(function(result){
-    console.log(result)
-    videoshow(result, videoOptions)
-    .save('video.mp4')
-    .on('start', (command) =>{
-      console.log('ffmpeg process started:', command)
-    })
-    .on('error', (err, stdout, stderr) =>{
-      console.error('Error:', err)
-      console.error('ffmpeg stderr:', stderr)
-    })
-    .on('end', (output) =>{
-      console.error('Video created in:', output);
-      res.sendfile(output)
+function getVideos(options, videos){
+  return new Promise( (resolve, reject, err) =>{
+    if(err){
+      reject(err)
+    }
+    let index = 0
+    for(let x = 0; x < videos.length; x++){
+      if(videos[x].ext == 'video'){
+        FfmpegCommand()
+        .input(videos[x].path)
+        .size('1024x576')
+        .save(x+'video.mp4')
+        .on('end', () =>{
+          index += 1
+          console.log(x+'file')
+          if(index == videos.length){
+            console.log("6")
+            resolve(options)
+          }
+        })
+      }
+      else{
+        FfmpegCommand()
+        .input(videos[x].path)
+        .loop(4)
+        .save(x+'video.mp4')
+        .on('end', () =>{
+          index += 1
+          console.log(x+'file')
+          if(index == videos.length){
+            console.log("6")
+            resolve(options)
+          }
+        })
+      }
+      options.videos.push(x+'video.mp4')
 
+    }
+  })
+}
+
+async function makeVideo(files){
+
+}
+
+app.post('/upload', upload.array('files'), (req, res) =>{
+  var json = null
+  var videos = new Array()
+  var options = {
+    output: 'video.mp4',
+    videos: [],
+    transition: {
+      name: 'swap',
+      duration: 50
+    }
+}
+  getData(req.files).then(function(result){
+    console.log(result)
+    getVideos(options, result).then((response)=>{
+      console.log("2")
+      makeVideo(response).then(async function(filepath){
+        await concat(response)
+        res.sendFile(__dirname + '/' + 'video.mp4')
+      })
     })
+
+
   })
 });
 
-
 var download = function(uri, filename, callback){
-  request.head(uri, async function(err, res, body){
+  request.head(uri, function(err, res, body){
   console.log('content-type:', res.headers['content-type']);
   console.log('content-length:', res.headers['content-length']);
   var writeStream = fs.createWriteStream(filename)
-  file = await request(uri).pipe(writeStream).on('close', callback);
+  request(uri).pipe(writeStream).on('close', callback);
   });
 };
-
 
 module.exports = server;
