@@ -1,11 +1,11 @@
 const express = require('express');
-const sharp = require('sharp');
 const morgan =  require('morgan');
-var videoshow = require('videoshow');
 var FfmpegCommand = require('fluent-ffmpeg');
+var resizeImage = require('resize-image');
 var clone = require('clone');
 const bodyParser = require('body-parser');
 var distance = require('gps-distance');
+const geolib = require('geolib')
 const concat = require('ffmpeg-concat')
 const request = require('request');
 const port = 3000
@@ -23,9 +23,15 @@ server.listen(port, () =>{
 });
 const io = require('socket.io')(server)
 var files
-var jsonN
-var paths = []
 var info = []
+let point1 = 0
+let point2 = 0
+let url = 'http://gcsproject-api.000webhostapp.com/staticmap.php/?'
+let center = 'center='
+let zoomSize = '&zoom='
+let size = '17'
+let imgsize = 'size=1024x576'
+let mark ='&maptype=mapnik&markers='
 
 app.set('appName', 'Trip Experience');
 
@@ -44,23 +50,20 @@ function sortJson(json){
       if(json === null){
         reject('Error: null value ')
       }
-      resolve(sortJsonArray(json, 'date', 'des'));
+      resolve(sortJsonArray(json, 'date', 'asc'));
   })
 }
 
 function getData(fileList){
   return new Promise( (resolve, reject) =>{
+    var info = new Array()
     files = fileList
     let gps = ""
     var index = 0
     for(let i = 0; i < files.length; i++){
       var json = {"path": 'im.png', "date": 2019, "position": '2929232', "ext": 'image'}
-      let url = 'http://gcsproject-api.000webhostapp.com/staticmap.php/?center='
-      let zoomSize = '&zoom=17&size=1024x576'
-      let mark ='&maptype=mapnik&markers='
       let date
       fs.readFile(files[i].path, (err, data) =>{
-        let numberDate = 0
         if (err)
           reject(err);
         else{
@@ -72,12 +75,9 @@ function getData(fileList){
               info[(2*i) + 1] = clone(json)
               let type = metadata['mimeType'].split("/")
               if (type[0] != 'video'){
-                sharp(files[i].path)
-                .resize(1024, 576)
-                .ignoreAspectRatio()
-                .toFile(files[i].path+i)
-                .then( (data) => {} )
-                .catch( (err) =>{reject(err)})
+                resizeImg(fs.readFileSync(files[i].path), {width: 1024, height: 576}).then(buf => {
+                  fs.writeFileSync(files[i].path + i, buf);
+              });
                 info[(2*i)].path = files[i].path + i
               }
               else{
@@ -85,13 +85,11 @@ function getData(fileList){
                 info[(2*i)].ext = 'video'
               }
               date = metadata['createDate']
+              let numberDate = ''
               date = date.split(/[: \s]/)
-              numberDate += parseFloat(date[0])
-              numberDate += parseFloat(date[1])*2
-              numberDate += parseFloat(date[2]/30)
-              numberDate += ((parseFloat (date[3]))+1)/(60*12)
-              numberDate += ((parseFloat(date[4]))+1)/(60*12*60)
-              numberDate += ((parseFloat (date[5]))+1)/(60*12*60*60)
+              date.forEach((value) => {
+                numberDate += value
+              } )
               gps = metadata['gpsPosition']
               gps = gps.split(' ')
 
@@ -101,25 +99,51 @@ function getData(fileList){
               }
               let pos = gpsLocation[0] + ',' + (gpsLocation[1])*-1
 
-              info[(2*i)].date = numberDate
+              info[(2*i)].date = parseFloat(numberDate)
 
               info[(2*i)].position = pos
-              info[(2*i) + 1].date = numberDate + 0.000000001
-              info[(2*i) + 1].path = i+'1image.png'
+              info[(2*i) + 1].date = parseFloat(numberDate) - 0.1
+              info[(2*i) + 1].path = i+'image.png'
               info[(2*i) + 1].position = pos
-              paths.push(i+'1image.png')
-              paths.push(files[i].path + i)
 
-              url+= pos + zoomSize + mark + pos + ',lightblue1'
-
-              download(url, i+'1image.png', function(){
+              let fullurl = url + center + pos + '&' + imgsize + zoomSize + size + mark + pos + ',lightblue1'
+              console.log(fullurl)
+              download(fullurl, i+'image.png', function(){
                 console.log('done');
                 index += 1
-                sortJson(info).then(function(result){
-                  if (index == files.length){
-                    resolve(result)
-                  }
-                } )
+                if (index == files.length) {
+                  sortJson(info).then(async function(result){
+                    point1 = info[0].position.split(',')
+                    point2 = info[info.length - 1].position.split(',')
+                    let zoom = 5
+                    let dist = distance(parseFloat(point1[0]), parseFloat(point1[1]), parseFloat(point2[0]), parseFloat(point2[1]));
+                    if (dist <= 1000){
+                      if (dist <= 400){
+                        zoom = 8
+                      }
+                      let centerP = geolib.getCenter([
+                        {latitude: parseFloat(point1[0]), longitude: parseFloat(point1[1])},
+                        {latitude: parseFloat(point2[0]), longitude: parseFloat(point2[1])}
+                      ]);
+                      fullurl = url + center + centerP.latitude + ',' + centerP.longitude + '&' + imgsize + zoomSize + zoom + mark + info[0].position + ',' + 'lightblue2' + '|' + info[info.length - 1].position + ','  + 'lightblue3'
+                    }
+                    else{
+                      fullurl = url + imgsize + zoomSize + '2' + mark + info[0].position + ',' + 'lightblue2' + '|' + info[info.length - 1].position + ','  + 'lightblue3'
+                    }
+                    console.log(fullurl)
+                    download(fullurl, (i+'mage.png'), function () {
+                      json.date = info[0].date - 10
+                      json.position = 0
+                      json.path = i+'mage.png'
+                      info[(files.length*2)] = clone(json)
+                      console.log('first done')
+                       sortJson(info).then( (resp) =>{
+                         console.log(info)
+                         resolve(info)
+                       })
+                    })
+                  })
+                }
               })
             };
           })
@@ -145,7 +169,6 @@ function getVideos(options, videos){
           index += 1
           console.log(x+'file')
           if(index == videos.length){
-            console.log("6")
             resolve(options)
           }
         })
@@ -159,24 +182,16 @@ function getVideos(options, videos){
           index += 1
           console.log(x+'file')
           if(index == videos.length){
-            console.log("6")
             resolve(options)
           }
         })
       }
       options.videos.push(x+'video.mp4')
-
     }
   })
 }
 
-async function makeVideo(files){
-
-}
-
 app.post('/upload', upload.array('files'), (req, res) =>{
-  var json = null
-  var videos = new Array()
   var options = {
     output: 'video.mp4',
     videos: [],
@@ -186,25 +201,23 @@ app.post('/upload', upload.array('files'), (req, res) =>{
     }
 }
   getData(req.files).then(function(result){
-    console.log(result)
-    getVideos(options, result).then((response)=>{
+    getVideos(options, result).then( async function (response){
       console.log("2")
-      makeVideo(response).then(async function(filepath){
-        await concat(response)
-        res.sendFile(__dirname + '/' + 'video.mp4')
-      })
+      await concat(response)
+      res.sendFile(__dirname + '/' + 'video.mp4')
     })
-
-
   })
 });
 
 var download = function(uri, filename, callback){
   request.head(uri, function(err, res, body){
+  console.log('file:: ', filename);
   console.log('content-type:', res.headers['content-type']);
   console.log('content-length:', res.headers['content-length']);
   var writeStream = fs.createWriteStream(filename)
-  request(uri).pipe(writeStream).on('close', callback);
+  request(uri).pipe(writeStream).on('close', callback).on('error', (err) =>{
+    console.error(err);
+  });
   });
 };
 
