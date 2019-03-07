@@ -1,7 +1,7 @@
 const express = require('express');
 const morgan =  require('morgan');
 var FfmpegCommand = require('fluent-ffmpeg');
-var resizeImage = require('resize-image');
+const resizeImg = require('resize-img');
 var clone = require('clone');
 const bodyParser = require('body-parser');
 var distance = require('gps-distance');
@@ -76,7 +76,7 @@ function getData(fileList){
               let type = metadata['mimeType'].split("/")
               if (type[0] != 'video'){
                 resizeImg(fs.readFileSync(files[i].path), {width: 1024, height: 576}).then(buf => {
-                  fs.writeFileSync(files[i].path + i, buf);
+                  fs.writeFileSync(files[i].path+i, buf);
               });
                 info[(2*i)].path = files[i].path + i
               }
@@ -97,7 +97,13 @@ function getData(fileList){
               for(let j = 0; j < 2; j++){
                 gpsLocation.push(parseFloat(gps[0+(j*5)]) + (parseFloat(gps[2+(j*5)])/60) + (parseFloat(gps[3+(j*5)])/3600))
               }
-              let pos = gpsLocation[0] + ',' + (gpsLocation[1])*-1
+              if (gps[4] == 'S'){
+                gpsLocation[0] = gpsLocation[0]*(-1)
+              }
+              if(gps[9] == 'W'){
+                gpsLocation[1] = gpsLocation[1]*(-1)
+              }
+              let pos = gpsLocation[0] + ',' + (gpsLocation[1])
 
               info[(2*i)].date = parseFloat(numberDate)
 
@@ -120,6 +126,9 @@ function getData(fileList){
                     if (dist <= 1000){
                       if (dist <= 400){
                         zoom = 8
+                      }
+                      if (dist <= 100){
+                        zoom = 10
                       }
                       let centerP = geolib.getCenter([
                         {latitude: parseFloat(point1[0]), longitude: parseFloat(point1[1])},
@@ -201,6 +210,7 @@ app.post('/upload', upload.array('files'), (req, res) =>{
     }
 }
   getData(req.files).then(function(result){
+    result[result.length] = clone(result[0])
     getVideos(options, result).then( async function (response){
       console.log("2")
       await concat(response)
